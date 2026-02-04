@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pro Tennis Jobs Database</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        color-scheme: light;
+        --bg: #0f172a;
+        --bg-soft: #111c35;
+        --card: #ffffff;
+        --muted: #94a3b8;
+        --text: #0f172a;
+        --accent: #4f46e5;
+        --accent-soft: #e0e7ff;
+        --border: #e2e8f0;
+        --shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      }
+
+      body {
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        line-height: 1.6;
+        color: var(--text);
+        background: #f8fafc;
+      }
+
+      .container {
+        width: min(1100px, 92%);
+        margin: 0 auto;
+      }
+
+      .hero {
+        background: radial-gradient(circle at top, #4f46e5 0%, var(--bg) 55%);
+        color: #f8fafc;
+        padding: 72px 0 80px;
+      }
+
+      .hero .container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 32px;
+        align-items: center;
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.72rem;
+        color: rgba(248, 250, 252, 0.7);
+        margin-bottom: 16px;
+      }
+
+      .hero h1 {
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        line-height: 1.15;
+        margin-bottom: 14px;
+      }
+
+      .subtitle {
+        color: rgba(248, 250, 252, 0.75);
+        margin-bottom: 24px;
+        max-width: 500px;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        border: none;
+        padding: 12px 22px;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+      }
+
+      .btn[aria-disabled="true"] {
+        cursor: not-allowed;
+        opacity: 0.6;
+        box-shadow: none;
+      }
+
+      .btn-primary {
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      .btn-ghost {
+        background: rgba(248, 250, 252, 0.1);
+        color: #f8fafc;
+        border: 1px solid rgba(248, 250, 252, 0.2);
+      }
+
+      .hero-card {
+        background: rgba(248, 250, 252, 0.12);
+        border: 1px solid rgba(248, 250, 252, 0.2);
+        border-radius: 20px;
+        padding: 28px;
+        backdrop-filter: blur(8px);
+        text-align: center;
+      }
+
+      .hero-card-label {
+        font-size: 0.9rem;
+        color: rgba(248, 250, 252, 0.7);
+      }
+
+      .hero-card-value {
+        font-size: 2.4rem;
+        font-weight: 700;
+        margin: 12px 0 6px;
+      }
+
+      .hero-card-meta {
+        color: rgba(248, 250, 252, 0.65);
+      }
+
+      .hero-card-badge {
+        display: inline-block;
+        margin-top: 18px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(248, 250, 252, 0.18);
+        font-size: 0.8rem;
+      }
+
+      .stats {
+        margin-top: -36px;
+        padding-bottom: 30px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+      }
+
+      .stat-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+      }
+
+      .stat-label {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+      }
+
+      .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .stat-note {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .jobs {
+        padding: 50px 0 70px;
+      }
+
+      .section-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+
+      .section-header h2 {
+        font-size: 1.9rem;
+        margin-bottom: 8px;
+      }
+
+      .section-header p {
+        color: var(--muted);
+      }
+
+      .data-status {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .filters {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+        margin-bottom: 26px;
+      }
+
+      .filters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+      }
+
+      .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .filter-field input {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-size: 0.95rem;
+        color: var(--text);
+      }
+
+      .filters-actions {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .filters-hint {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .pill {
+        background: var(--accent-soft);
+        color: var(--accent);
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .jobs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 22px;
+      }
+
+      .job-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .job-card h3 {
+        font-size: 1.15rem;
+      }
+
+      .job-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .job-summary {
+        color: #1e293b;
+        font-size: 0.95rem;
+      }
+
+      .job-apply-note {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .job-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-size: 0.8rem;
+        padding: 4px 10px;
+        border-radius: 999px;
+      }
+
+      .job-actions {
+        margin-top: auto;
+        display: flex;
+        gap: 10px;
+      }
+
+      .load-more {
+        margin-top: 24px;
+        display: flex;
+        justify-content: center;
+      }
+
+      .btn-secondary {
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      .btn-outline {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: #0f172a;
+      }
+
+      .footer {
+        background: var(--bg-soft);
+        color: rgba(248, 250, 252, 0.8);
+        padding: 28px 0;
+      }
+
+      .footer-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+        font-size: 0.9rem;
+      }
+
+      .footer-muted {
+        color: rgba(248, 250, 252, 0.55);
+      }
+
+      @media (max-width: 640px) {
+        .hero {
+          padding: 60px 0;
+        }
+
+        .hero-actions {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .filters-actions {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .job-actions {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <div class="hero-content">
+          <p class="eyebrow">Pro Tennis Jobs Database</p>
+          <h1>Explore current tennis opportunities</h1>
+          <p class="subtitle">
+            A clean snapshot of the latest roles, pulled from the live dataset.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#jobs">Browse sample jobs</a>
+            <button class="btn btn-ghost" id="refresh-btn">Refresh stats</button>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-label">Database status</div>
+          <div class="hero-card-value" id="stat-total">--</div>
+          <div class="hero-card-meta">total roles indexed</div>
+          <div class="hero-card-badge">Live sample</div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="stats">
+        <div class="container stats-grid">
+          <div class="stat-card">
+            <p class="stat-label">Average fit score</p>
+            <p class="stat-value" id="stat-avg-score">--</p>
+            <p class="stat-note">Based on suitability score</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-label">Top hiring state</p>
+            <p class="stat-value" id="stat-top-state">--</p>
+            <p class="stat-note">Highest number of roles</p>
+          </div>
+          <div class="stat-card">
+            <p class="stat-label">Most recent posting</p>
+            <p class="stat-value" id="stat-latest-date">--</p>
+            <p class="stat-note">Latest date in dataset</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="jobs" id="jobs">
+        <div class="container">
+          <div class="section-header">
+            <div>
+              <h2>Live roles</h2>
+              <p>
+                Showing a curated slice of the database. Apply buttons connect
+                to the source application details.
+              </p>
+              <p class="data-status" id="data-status"></p>
+            </div>
+          </div>
+          <div class="filters">
+            <form id="filter-form">
+              <div class="filters-grid">
+                <label class="filter-field">
+                  <span>Keyword search</span>
+                  <input
+                    type="search"
+                    id="filter-query"
+                    placeholder="e.g. tennis professional, assistant coach"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="filter-field">
+                  <span>Location</span>
+                  <input
+                    type="text"
+                    id="filter-location"
+                    placeholder="City or state"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="filter-field">
+                  <span>Posted from</span>
+                  <input type="date" id="filter-posted-from" />
+                </label>
+                <label class="filter-field">
+                  <span>Posted to</span>
+                  <input type="date" id="filter-posted-to" />
+                </label>
+                <label class="filter-field">
+                  <span>Minimum fit score</span>
+                  <input
+                    type="number"
+                    id="filter-min-score"
+                    min="0"
+                    max="10"
+                    step="1"
+                    placeholder="0-10"
+                  />
+                </label>
+              </div>
+              <div class="filters-actions">
+                <button class="btn btn-secondary" type="submit">
+                  Apply filters
+                </button>
+                <button class="btn btn-outline" type="button" id="clear-filters">
+                  Clear filters
+                </button>
+                <span class="filters-hint">
+                  Tip: set both dates to the same day for an exact match.
+                </span>
+              </div>
+            </form>
+          </div>
+          <div class="jobs-grid" id="jobs-grid"></div>
+          <div class="load-more">
+            <button class="btn btn-secondary" id="view-more-btn">
+              View more
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-content">
+        <p>Built for the Pro Tennis Jobs project.</p>
+        <p class="footer-muted">Data source: protennisjobs.com</p>
+      </div>
+    </footer>
+
+    <script>
+      const statTotal = document.getElementById("stat-total");
+      const statAvgScore = document.getElementById("stat-avg-score");
+      const statTopState = document.getElementById("stat-top-state");
+      const statLatestDate = document.getElementById("stat-latest-date");
+      const jobsGrid = document.getElementById("jobs-grid");
+      const refreshButton = document.getElementById("refresh-btn");
+      const dataStatus = document.getElementById("data-status");
+      const viewMoreButton = document.getElementById("view-more-btn");
+      const filterForm = document.getElementById("filter-form");
+      const filterQuery = document.getElementById("filter-query");
+      const filterLocation = document.getElementById("filter-location");
+      const filterPostedFrom = document.getElementById("filter-posted-from");
+      const filterPostedTo = document.getElementById("filter-posted-to");
+      const filterMinScore = document.getElementById("filter-min-score");
+      const clearFiltersButton = document.getElementById("clear-filters");
+
+      const PAGE_SIZE = 6;
+      const AUTO_REFRESH_MINUTES = 15;
+      let currentOffset = 0;
+      let totalJobs = 0;
+      const activeFilters = {
+        q: "",
+        location: "",
+        postedFrom: "",
+        postedTo: "",
+        minScore: "",
+      };
+
+      const monthMap = {
+        january: 0,
+        february: 1,
+        march: 2,
+        april: 3,
+        may: 4,
+        june: 5,
+        july: 6,
+        august: 7,
+        september: 8,
+        october: 9,
+        november: 10,
+        december: 11,
+      };
+
+      const formatDate = (date) =>
+        new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }).format(date);
+
+      const parsePostedDate = (value) => {
+        if (!value || typeof value !== "string") return null;
+        const parts = value.trim().split(" ");
+        if (parts.length < 3) return null;
+        const [day, monthName, year] = parts;
+        const monthIndex = monthMap[monthName.toLowerCase()];
+        if (monthIndex === undefined) return null;
+        return new Date(Number(year), monthIndex, Number(day));
+      };
+
+      const truncate = (text, max = 160) => {
+        if (!text) return "No summary available.";
+        if (text.length <= max) return text;
+        return `${text.slice(0, max).trim()}...`;
+      };
+
+      const getFirstEmail = (emails) => {
+        if (!emails) return "";
+        return emails.split(/[;,]/).map((email) => email.trim())[0] || "";
+      };
+
+      const buildApplyLink = (job) => {
+        const contactUrl = job.contact_url || "";
+        const email = getFirstEmail(job.contact_emails);
+        if (contactUrl) {
+          return { href: contactUrl, label: "Apply now" };
+        }
+        if (email) {
+          return {
+            href: "#",
+            label: "Email to apply",
+            type: "email",
+          };
+        }
+        if (job.source_url) {
+          return { href: job.source_url, label: "Apply on listing" };
+        }
+        return { href: "#", label: "Apply unavailable", disabled: true };
+      };
+
+      const createJobCard = (job) => {
+        const card = document.createElement("article");
+        card.className = "job-card";
+
+        const title = document.createElement("h3");
+        title.textContent = job.job_title || "Tennis Role";
+
+        const meta = document.createElement("div");
+        meta.className = "job-meta";
+        const location = `${job.location?.city || "Unknown City"}, ${
+          job.location?.state || "Unknown"
+        }`;
+        meta.textContent = `${location} • ${job.posted_date || "Date unknown"}`;
+
+        const summary = document.createElement("p");
+        summary.className = "job-summary";
+        summary.textContent = truncate(job.job_summary || job.position_overview);
+
+        let applyNote = null;
+        if (!job.contact_url && !job.contact_emails && job.how_to_apply) {
+          applyNote = document.createElement("p");
+          applyNote.className = "job-apply-note";
+          applyNote.textContent = `How to apply: ${truncate(job.how_to_apply, 140)}`;
+        }
+
+        const tags = document.createElement("div");
+        tags.className = "job-tags";
+        const scoreTag = document.createElement("span");
+        scoreTag.className = "tag";
+        scoreTag.textContent = `Fit score: ${
+          Number.isFinite(job.suitability_score) ? job.suitability_score : "N/A"
+        }`;
+        const sourceTag = document.createElement("span");
+        sourceTag.className = "tag";
+        sourceTag.textContent = job.contact_name || "Unknown org";
+        tags.append(scoreTag, sourceTag);
+
+        const actions = document.createElement("div");
+        actions.className = "job-actions";
+        const applyLink = buildApplyLink(job);
+        const applyBtn = document.createElement("a");
+        applyBtn.className = "btn btn-secondary";
+        applyBtn.textContent = applyLink.label;
+        applyBtn.href = applyLink.href;
+        applyBtn.target = "_blank";
+        applyBtn.rel = "noreferrer";
+        if (applyLink.disabled) {
+          applyBtn.setAttribute("aria-disabled", "true");
+          applyBtn.addEventListener("click", (event) => event.preventDefault());
+        }
+        if (applyLink.type === "email") {
+          applyBtn.href = "#";
+          applyBtn.addEventListener("click", async (event) => {
+            event.preventDefault();
+            if (applyBtn.getAttribute("aria-disabled") === "true") return;
+            applyBtn.textContent = "Drafting...";
+            applyBtn.setAttribute("aria-disabled", "true");
+
+            try {
+              const response = await fetch(
+                `/api/email-draft?source_url=${encodeURIComponent(
+                  job.source_url || ""
+                )}`
+              );
+              if (!response.ok) {
+                throw new Error("Unable to generate draft.");
+              }
+              const payload = await response.json();
+              const gmailUrl =
+                "https://mail.google.com/mail/?view=cm&fs=1" +
+                `&to=${encodeURIComponent(payload.to)}` +
+                `&su=${encodeURIComponent(payload.subject)}` +
+                `&body=${encodeURIComponent(payload.body)}`;
+
+              window.location.href = gmailUrl;
+            } catch (error) {
+              alert("Could not generate the email draft. Please try again.");
+            } finally {
+              applyBtn.textContent = applyLink.label;
+              applyBtn.setAttribute("aria-disabled", "false");
+            }
+          });
+        }
+
+        const detailsLink = document.createElement("a");
+        detailsLink.className = "btn btn-outline";
+        detailsLink.textContent = "View details";
+        if (job.source_url) {
+          detailsLink.href = `job-details.html?source_url=${encodeURIComponent(
+            job.source_url
+          )}`;
+        } else {
+          detailsLink.href = "#";
+          detailsLink.setAttribute("aria-disabled", "true");
+          detailsLink.addEventListener("click", (event) => event.preventDefault());
+        }
+
+        actions.append(applyBtn, detailsLink);
+        if (applyNote) {
+          card.append(title, meta, summary, applyNote, tags, actions);
+        } else {
+          card.append(title, meta, summary, tags, actions);
+        }
+
+        return card;
+      };
+
+      const renderJobs = (jobs, { reset = false } = {}) => {
+        if (reset) jobsGrid.innerHTML = "";
+        jobs.forEach((job) => jobsGrid.appendChild(createJobCard(job)));
+      };
+
+      const formatDateInput = (value) => {
+        if (!value) return "";
+        const date = new Date(`${value}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return value;
+        return formatDate(date);
+      };
+
+      const buildFilterSummary = () => {
+        const parts = [];
+        if (activeFilters.q) parts.push(`keyword "${activeFilters.q}"`);
+        if (activeFilters.location)
+          parts.push(`location "${activeFilters.location}"`);
+        if (activeFilters.postedFrom)
+          parts.push(`posted from ${formatDateInput(activeFilters.postedFrom)}`);
+        if (activeFilters.postedTo)
+          parts.push(`posted to ${formatDateInput(activeFilters.postedTo)}`);
+        if (activeFilters.minScore)
+          parts.push(`fit score ≥ ${activeFilters.minScore}`);
+        return parts.join(", ");
+      };
+
+      const updateStatusText = () => {
+        if (!dataStatus) return;
+        if (totalJobs === 0) {
+          dataStatus.textContent = "No roles match the current filters.";
+          return;
+        }
+        const shown = Math.min(currentOffset, totalJobs);
+        const summary = buildFilterSummary();
+        dataStatus.textContent = summary
+          ? `Showing ${shown} of ${totalJobs} roles. Filters: ${summary}.`
+          : `Showing ${shown} of ${totalJobs} roles.`;
+      };
+
+      const updateViewMore = () => {
+        if (!viewMoreButton) return;
+        const remaining = totalJobs - currentOffset;
+        viewMoreButton.disabled = remaining <= 0;
+        viewMoreButton.textContent =
+          remaining <= 0 ? "All roles loaded" : "View more";
+        viewMoreButton.style.opacity = remaining <= 0 ? "0.6" : "1";
+      };
+
+      const buildFilterParams = () => {
+        const params = new URLSearchParams();
+        if (activeFilters.q) params.set("q", activeFilters.q);
+        if (activeFilters.location) params.set("location", activeFilters.location);
+        if (activeFilters.postedFrom)
+          params.set("posted_from", activeFilters.postedFrom);
+        if (activeFilters.postedTo) params.set("posted_to", activeFilters.postedTo);
+        if (activeFilters.minScore)
+          params.set("min_score", activeFilters.minScore);
+        return params.toString();
+      };
+
+      const syncFilters = () => {
+        activeFilters.q = filterQuery?.value.trim() || "";
+        activeFilters.location = filterLocation?.value.trim() || "";
+        activeFilters.postedFrom = filterPostedFrom?.value || "";
+        activeFilters.postedTo = filterPostedTo?.value || "";
+        activeFilters.minScore = filterMinScore?.value.trim() || "";
+      };
+
+      const loadStats = async () => {
+        const response = await fetch("/api/stats");
+        if (!response.ok) throw new Error("Could not load stats.");
+        const stats = await response.json();
+        totalJobs = stats.total || 0;
+        statTotal.textContent = totalJobs.toLocaleString();
+        statAvgScore.textContent = stats.avgScore ?? "No data";
+        statTopState.textContent = stats.topState || "Unknown";
+        statLatestDate.textContent = stats.latestDate || "No data";
+        updateViewMore();
+      };
+
+      const loadJobs = async ({ reset = false } = {}) => {
+        try {
+          if (reset) currentOffset = 0;
+          const filterParams = buildFilterParams();
+          const querySuffix = filterParams ? `&${filterParams}` : "";
+          const response = await fetch(
+            `/api/jobs?offset=${currentOffset}&limit=${PAGE_SIZE}${querySuffix}`
+          );
+          if (!response.ok) throw new Error("Could not load jobs file.");
+          const payload = await response.json();
+          renderJobs(payload.jobs, { reset });
+          currentOffset += payload.jobs.length;
+          totalJobs = payload.total;
+          updateViewMore();
+          updateStatusText();
+        } catch (error) {
+          if (dataStatus) {
+            dataStatus.textContent =
+              "Start the backend server to load the full dataset.";
+          }
+          statTotal.textContent = "--";
+          statAvgScore.textContent = "--";
+          statTopState.textContent = "--";
+          statLatestDate.textContent = "--";
+          if (viewMoreButton) viewMoreButton.disabled = true;
+        }
+      };
+
+      let autoRefreshInFlight = false;
+      const scheduleAutoRefresh = () => {
+        if (!AUTO_REFRESH_MINUTES) return;
+        setInterval(async () => {
+          if (autoRefreshInFlight) return;
+          autoRefreshInFlight = true;
+          try {
+            await loadStats();
+            await loadJobs({ reset: true });
+          } finally {
+            autoRefreshInFlight = false;
+          }
+        }, AUTO_REFRESH_MINUTES * 60 * 1000);
+      };
+
+      filterForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        syncFilters();
+        await loadJobs({ reset: true });
+      });
+
+      clearFiltersButton?.addEventListener("click", async () => {
+        if (filterQuery) filterQuery.value = "";
+        if (filterLocation) filterLocation.value = "";
+        if (filterPostedFrom) filterPostedFrom.value = "";
+        if (filterPostedTo) filterPostedTo.value = "";
+        if (filterMinScore) filterMinScore.value = "";
+        syncFilters();
+        await loadJobs({ reset: true });
+      });
+
+      refreshButton?.addEventListener("click", async () => {
+        await loadStats();
+        await loadJobs({ reset: true });
+      });
+
+      viewMoreButton?.addEventListener("click", () => loadJobs());
+
+      (async () => {
+        await loadStats();
+        await loadJobs({ reset: true });
+        scheduleAutoRefresh();
+      })();
+    </script>
+  </body>
+</html>

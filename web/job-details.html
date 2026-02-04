@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Details • Pro Tennis Jobs</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        color-scheme: light;
+        --bg: #0f172a;
+        --bg-soft: #111c35;
+        --card: #ffffff;
+        --muted: #94a3b8;
+        --text: #0f172a;
+        --accent: #4f46e5;
+        --accent-soft: #e0e7ff;
+        --border: #e2e8f0;
+        --shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+      }
+
+      body {
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        line-height: 1.6;
+        color: var(--text);
+        background: #f8fafc;
+      }
+
+      .container {
+        width: min(1100px, 92%);
+        margin: 0 auto;
+      }
+
+      .hero {
+        background: radial-gradient(circle at top, #4f46e5 0%, var(--bg) 55%);
+        color: #f8fafc;
+        padding: 56px 0 64px;
+      }
+
+      .hero h1 {
+        font-size: clamp(2rem, 4vw, 3.1rem);
+        line-height: 1.15;
+        margin-bottom: 12px;
+      }
+
+      .hero-subtitle {
+        color: rgba(248, 250, 252, 0.75);
+        max-width: 620px;
+      }
+
+      .hero-actions {
+        margin-top: 18px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        border: none;
+        padding: 12px 22px;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+      }
+
+      .btn-primary {
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      .btn-outline {
+        background: transparent;
+        border: 1px solid rgba(248, 250, 252, 0.35);
+        color: #f8fafc;
+      }
+
+      .content {
+        padding: 36px 0 70px;
+      }
+
+      .summary-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+        padding: 24px;
+        margin-top: -52px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .pill {
+        background: var(--accent-soft);
+        color: var(--accent);
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .section {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px;
+        box-shadow: var(--shadow);
+      }
+
+      .section + .section {
+        margin-top: 18px;
+      }
+
+      .section h2 {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+      }
+
+      .section p {
+        color: #1e293b;
+      }
+
+      .details-grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .meta strong {
+        color: var(--text);
+        display: block;
+      }
+
+      .footer {
+        background: var(--bg-soft);
+        color: rgba(248, 250, 252, 0.8);
+        padding: 28px 0;
+      }
+
+      .footer-content {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+        font-size: 0.9rem;
+      }
+
+      .footer-muted {
+        color: rgba(248, 250, 252, 0.55);
+      }
+
+      @media (max-width: 640px) {
+        .hero-actions {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .summary-card {
+          margin-top: -38px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <h1 id="job-title">Loading job details...</h1>
+        <p class="hero-subtitle" id="job-subtitle"></p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="index.html#jobs">Back to listings</a>
+          <a class="btn btn-outline" id="apply-link" href="#">Apply now</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="container">
+        <section class="summary-card">
+          <div class="pill-row" id="job-pills"></div>
+          <div class="meta" id="job-meta"></div>
+          <p id="job-summary"></p>
+        </section>
+
+        <div class="details-grid">
+          <section class="section" id="section-overview">
+            <h2>Position overview</h2>
+            <p id="job-overview"></p>
+          </section>
+          <section class="section" id="section-responsibilities">
+            <h2>Key responsibilities</h2>
+            <p id="job-responsibilities"></p>
+          </section>
+          <section class="section" id="section-qualifications">
+            <h2>Required qualifications</h2>
+            <p id="job-qualifications"></p>
+          </section>
+          <section class="section" id="section-preferred">
+            <h2>Preferred certifications</h2>
+            <p id="job-preferred"></p>
+          </section>
+          <section class="section" id="section-compensation">
+            <h2>Compensation & benefits</h2>
+            <p id="job-compensation"></p>
+          </section>
+          <section class="section" id="section-schedule">
+            <h2>Work schedule</h2>
+            <p id="job-schedule"></p>
+          </section>
+          <section class="section" id="section-physical">
+            <h2>Physical requirements</h2>
+            <p id="job-physical"></p>
+          </section>
+          <section class="section" id="section-apply">
+            <h2>How to apply</h2>
+            <p id="job-apply"></p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-content">
+        <p>Built for the Pro Tennis Jobs project.</p>
+        <p class="footer-muted">Data source: protennisjobs.com</p>
+      </div>
+    </footer>
+
+    <script>
+      const titleEl = document.getElementById("job-title");
+      const subtitleEl = document.getElementById("job-subtitle");
+      const summaryEl = document.getElementById("job-summary");
+      const overviewEl = document.getElementById("job-overview");
+      const responsibilitiesEl = document.getElementById("job-responsibilities");
+      const qualificationsEl = document.getElementById("job-qualifications");
+      const preferredEl = document.getElementById("job-preferred");
+      const compensationEl = document.getElementById("job-compensation");
+      const scheduleEl = document.getElementById("job-schedule");
+      const physicalEl = document.getElementById("job-physical");
+      const applyEl = document.getElementById("job-apply");
+      const applyLink = document.getElementById("apply-link");
+      const pillsEl = document.getElementById("job-pills");
+      const metaEl = document.getElementById("job-meta");
+
+      const sections = [
+        { id: "section-overview", target: overviewEl },
+        { id: "section-responsibilities", target: responsibilitiesEl },
+        { id: "section-qualifications", target: qualificationsEl },
+        { id: "section-preferred", target: preferredEl },
+        { id: "section-compensation", target: compensationEl },
+        { id: "section-schedule", target: scheduleEl },
+        { id: "section-physical", target: physicalEl },
+        { id: "section-apply", target: applyEl },
+      ];
+
+      const monthMap = {
+        january: 0,
+        february: 1,
+        march: 2,
+        april: 3,
+        may: 4,
+        june: 5,
+        july: 6,
+        august: 7,
+        september: 8,
+        october: 9,
+        november: 10,
+        december: 11,
+      };
+
+      const formatDate = (date) =>
+        new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }).format(date);
+
+      const parsePostedDate = (value) => {
+        if (!value || typeof value !== "string") return null;
+        const parts = value.trim().split(" ");
+        if (parts.length < 3) return null;
+        const [day, monthName, year] = parts;
+        const monthIndex = monthMap[monthName.toLowerCase()];
+        if (monthIndex === undefined) return null;
+        return new Date(Number(year), monthIndex, Number(day));
+      };
+
+      const truncate = (text, max = 220) => {
+        if (!text) return "";
+        if (text.length <= max) return text;
+        return `${text.slice(0, max).trim()}...`;
+      };
+
+      const getFirstEmail = (emails) => {
+        if (!emails) return "";
+        return emails.split(/[;,]/).map((email) => email.trim())[0] || "";
+      };
+
+      const buildApplyLink = (job) => {
+        const contactUrl = job.contact_url || "";
+        const email = getFirstEmail(job.contact_emails);
+        if (contactUrl) {
+          return { href: contactUrl, label: "Apply now" };
+        }
+        if (email) {
+          const subject = encodeURIComponent(
+            `Application for ${job.job_title || "Tennis role"}`
+          );
+          const body = encodeURIComponent(
+            `Hello ${job.contact_name || ""},%0D%0A%0D%0AI'd like to apply for the ${
+              job.job_title || "role"
+            }.%0D%0A%0D%0AThanks.`
+          );
+          return { href: `mailto:${email}?subject=${subject}&body=${body}`, label: "Email to apply" };
+        }
+        if (job.source_url) {
+          return { href: job.source_url, label: "Apply on listing" };
+        }
+        return { href: "#", label: "Apply unavailable", disabled: true };
+      };
+
+      const addPill = (text) => {
+        if (!text) return;
+        const pill = document.createElement("span");
+        pill.className = "pill";
+        pill.textContent = text;
+        pillsEl.appendChild(pill);
+      };
+
+      const addMeta = (label, value) => {
+        if (!value) return;
+        const wrapper = document.createElement("div");
+        const strong = document.createElement("strong");
+        strong.textContent = label;
+        const text = document.createElement("span");
+        text.textContent = value;
+        wrapper.append(strong, text);
+        metaEl.appendChild(wrapper);
+      };
+
+      const setSection = (sectionId, target, value) => {
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+        if (!value) {
+          section.style.display = "none";
+          return;
+        }
+        target.textContent = value;
+      };
+
+      const setErrorState = (message) => {
+        titleEl.textContent = "Job details unavailable";
+        subtitleEl.textContent = message;
+        summaryEl.textContent =
+          "We could not load the job details. Please return to the listings.";
+        applyLink.textContent = "Back to listings";
+        applyLink.href = "index.html#jobs";
+        applyLink.className = "btn btn-primary";
+        sections.forEach((section) => {
+          const el = document.getElementById(section.id);
+          if (el) el.style.display = "none";
+        });
+      };
+
+      const loadJob = async () => {
+        const params = new URLSearchParams(window.location.search);
+        const sourceUrl = params.get("source_url");
+        if (!sourceUrl) {
+          setErrorState("Missing job reference.");
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `/api/job?source_url=${encodeURIComponent(sourceUrl)}`
+          );
+          if (!response.ok) throw new Error("Failed to load job.");
+          const job = await response.json();
+
+          const location = `${job.location?.city || "Unknown City"}, ${
+            job.location?.state || "Unknown"
+          }`;
+          const postedDate = parsePostedDate(job.posted_date);
+          titleEl.textContent = job.job_title || "Tennis Role";
+          subtitleEl.textContent = job.contact_name
+            ? `${job.contact_name} • ${location}`
+            : location;
+          summaryEl.textContent =
+            truncate(job.job_summary) ||
+            job.position_overview ||
+            "No summary available.";
+
+          addPill(`Location: ${location}`);
+          if (postedDate) addPill(`Posted ${formatDate(postedDate)}`);
+          if (Number.isFinite(job.suitability_score)) {
+            addPill(`Fit score: ${job.suitability_score}`);
+          }
+          if (Number.isFinite(job.distance_to_harrogate_tn_miles)) {
+            addPill(
+              `${job.distance_to_harrogate_tn_miles} miles from Harrogate, TN`
+            );
+          }
+
+          addMeta("Posted date", job.posted_date || "Date unknown");
+          addMeta("Location", location);
+          addMeta("Contact name", job.contact_name || "");
+          addMeta("Contact email", job.contact_emails || "");
+          addMeta("Contact city", job.contact_city || "");
+          addMeta("Contact address", job.contact_address || "");
+
+          const applyLinkData = buildApplyLink(job);
+          applyLink.textContent = applyLinkData.label;
+          applyLink.href = applyLinkData.href;
+          applyLink.target = "_blank";
+          applyLink.rel = "noreferrer";
+          if (applyLinkData.disabled) {
+            applyLink.setAttribute("aria-disabled", "true");
+            applyLink.addEventListener("click", (event) => event.preventDefault());
+          }
+
+          setSection(
+            "section-overview",
+            overviewEl,
+            job.position_overview || truncate(job.job_summary, 300)
+          );
+          setSection("section-responsibilities", responsibilitiesEl, job.key_responsibilities);
+          setSection("section-qualifications", qualificationsEl, job.required_qualifications);
+          setSection("section-preferred", preferredEl, job.preferred_certifications);
+          setSection("section-compensation", compensationEl, job.compensation_benefits);
+          setSection("section-schedule", scheduleEl, job.work_schedule);
+          setSection("section-physical", physicalEl, job.physical_requirements);
+          setSection("section-apply", applyEl, job.how_to_apply);
+        } catch (error) {
+          setErrorState("Something went wrong while loading the job.");
+        }
+      };
+
+      loadJob();
+    </script>
+  </body>
+</html>
