@@ -1,8 +1,7 @@
 # ProTennisJobs AI Scraper
 
-Automated scraper and web dashboard for tennis job listings, with AI-based
-fit scoring, distance calculations to Harrogate, TN, and draft outreach
-emails.
+AI-powered ProTennisJobs scraper with fit scoring, distance calculations,
+auto-generated personalized emails, and a browsing dashboard. Demo:
 
 ## Features
 - Scrapes tennis professional listings from ProTennisJobs.

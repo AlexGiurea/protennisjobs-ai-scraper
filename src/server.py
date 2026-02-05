@@ -418,23 +418,42 @@ def parse_json_from_text(text):
     return None
 
 
-EMAIL_TEMPLATE = """Tennis professional opportunity
+EMAIL_TEMPLATE = """Use a short, clean structure:
+1) Greeting.
+2) Intro sentence stating interest in the role.
+3) One paragraph summarizing relevant experience.
+4) One paragraph with availability/fit + call to action.
+5) Friendly close with name and contact info."""
 
-Hello (Mr./Ms./Coach/Director) (Last Name),
 
-My name is Alex Giurea, and I am reaching out to inquire about the tennis pro position you posted inside (Club/Resort Name). I am finishing my college tennis career at Lincoln Memorial University and will be available to begin work in mid-August or early September 2026. I am especially interested in a winter-season position and would be available through April or May 2027.
+def format_profile(profile):
+    def _join(value):
+        if not value:
+            return ""
+        if isinstance(value, (list, tuple)):
+            return ", ".join([str(item) for item in value if item])
+        return str(value)
 
-I have coaching and club experience in both the U.S. and Europe. Most recently, I worked at the Tarratine Club of Dark Harbor in Maine, where I assisted with private lessons, clinics, and daily programming in a busy seasonal environment. Before coming to the U.S., I also coached in Romania and have years of experience teaching a wide range of players. As an athlete, I have played tennis since I was seven years old, competed in professional tournaments, and I have completed a full collegiate career in the U.S., which has strengthened my ability to train with intention, communicate clearly, and lead on court.
-
-Because I will be working under post-completion OPT, I would need the position to support OPT employment. If (Club/Resort Name) is open to that, I would love to learn more about your needs for the upcoming season and see if my background could be a fit. I can share my resume and references right away, and I would be happy to set up a quick call at your convenience.
-
-Thank you for your time, and I look forward to hearing from you.
-
-Sincerely,
-Alex Giurea
-423-801-3020
-alex.rares.giurea@gmail.com
-"""
+    fields = [
+        ("Name", profile.get("full_name")),
+        ("Preferred name", profile.get("preferred_name")),
+        ("Location", profile.get("location")),
+        ("School", profile.get("school")),
+        ("Degree", profile.get("degree")),
+        ("Tennis background", _join(profile.get("tennis_background"))),
+        ("Target role", profile.get("target_role")),
+        ("Duties", _join(profile.get("duties"))),
+        ("Strengths", _join(profile.get("strengths"))),
+        ("Leadership", _join(profile.get("leadership"))),
+        ("Availability", profile.get("availability")),
+        ("Work authorization", profile.get("work_auth")),
+        ("Tone", profile.get("tone")),
+        ("Must include", _join(profile.get("must_include"))),
+        ("Style constraints", _join(profile.get("style_constraints"))),
+        ("Phone", profile.get("contact_phone")),
+    ]
+    lines = [f"{label}: {value}" for label, value in fields if value]
+    return "\n".join(lines)
 
 
 def guess_last_name(contact_name):
@@ -444,33 +463,57 @@ def guess_last_name(contact_name):
     return parts[-1] if len(parts) >= 2 else ""
 
 
-def build_email_prompt(job):
+def build_email_prompt(job, user_context):
     contact_name = job.get("contact_name") or ""
     contact_last_name = guess_last_name(contact_name)
-    org_name = extract_org_name(job)
+    org_name = extract_org_name(job) or contact_name or "your club"
     location = " ".join(
         filter(None, [job.get("location", {}).get("city"), job.get("location", {}).get("state")])
     )
+    job_title = job.get("job_title") or "tennis role"
+    job_summary = job.get("job_summary") or job.get("position_overview") or ""
+    user_context = (user_context or "").strip()
+    fallback_profile = format_profile(PROFILE)
+
     instructions = [
-        "Personalize the template with minimal changes by only replacing placeholders in parentheses.",
-        f"Replace (Mr./Ms./Coach/Director) with Coach.",
-        f"Replace (Last Name) with {contact_last_name or 'there'}.",
-        f"Replace (Club/Resort Name) with {org_name or 'your club'}.",
-        "Do not add, remove, or rephrase any other text.",
-        "Subject must be: Tennis professional opportunity.",
-        "Body must be the template text after the subject line.",
+        "Write a concise job application email (120-180 words).",
+        f"Address the contact as Coach {contact_last_name or 'there'}.",
+        f"Role: {job_title} at {org_name}.",
+        f"Location: {location or 'not provided'}.",
+        "Use the user context below as the primary source for the candidate info.",
+        "If user context is empty, use the fallback profile instead.",
+        "Reference relevant job details from the job summary when possible.",
+        "Do not invent credentials or experiences not stated.",
+        "Keep the tone professional, warm, and direct.",
         "Output JSON with keys: subject, body. Body should be plain text.",
+        f"Subject format: Application for {job_title} at {org_name}.",
+        "Follow this structure:",
+        EMAIL_TEMPLATE,
     ]
 
-    content = "\n".join([EMAIL_TEMPLATE, "", *instructions])
+    content = "\n".join(
+        [
+            "User context:",
+            user_context or "(none provided)",
+            "",
+            "Fallback profile (use only if user context is empty):",
+            fallback_profile or "(none provided)",
+            "",
+            "Job summary:",
+            job_summary or "(not provided)",
+            "",
+            "Instructions:",
+            *instructions,
+        ]
+    )
     return content
 
 
-def request_email_draft(job):
+def request_email_draft(job, user_context=""):
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is missing.")
 
-    prompt = build_email_prompt(job)
+    prompt = build_email_prompt(job, user_context)
     debug_prompt_path = os.path.join(DATA_DIR, "last_email_prompt.txt")
     try:
         with open(debug_prompt_path, "w", encoding="utf-8") as file:
@@ -483,10 +526,9 @@ def request_email_draft(job):
             {
                 "role": "system",
         "content": (
-                    "You write tennis job application emails using the provided template. "
-                    "Copy the template verbatim and only replace placeholders. "
-                    "Do not add, remove, or rephrase any other text. "
-                    "Return JSON only."
+                    "You write concise tennis job application emails. "
+                    "Use the provided user context and job details. "
+                    "Do not fabricate details. Return JSON only."
                 ),
             },
             {"role": "user", "content": prompt},
@@ -544,6 +586,7 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/email-draft":
             query = parse_qs(parsed.query)
             source_url = query.get("source_url", [""])[0]
+            user_context = query.get("user_context", [""])[0]
             job = find_job_by_source_url(ALL_JOBS, source_url)
             if not job:
                 self._send_json({"error": "Job not found."}, status=404)
@@ -553,7 +596,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "No contact email for this job."}, status=400)
                 return
             try:
-                draft = request_email_draft(job)
+                draft = request_email_draft(job, user_context=user_context)
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=500)
                 return
@@ -583,6 +626,53 @@ class Handler(SimpleHTTPRequestHandler):
             return
         return super().do_GET()
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path != "/api/email-draft":
+            self._send_json({"error": "Not found."}, status=404)
+            return
+        print(f"[email-draft] POST {self.path}")
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        body = self.rfile.read(length) if length > 0 else b""
+        try:
+            payload = json.loads(body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            print("[email-draft] Invalid JSON body.")
+            self._send_json({"error": "Invalid JSON body."}, status=400)
+            return
+        source_url = (payload.get("source_url") or "").strip()
+        user_context = (payload.get("user_context") or "").strip()
+        print(
+            "[email-draft] source_url=%s user_context_len=%s",
+            source_url or "(empty)",
+            len(user_context),
+        )
+        job = find_job_by_source_url(ALL_JOBS, source_url)
+        if not job:
+            print("[email-draft] Job not found.")
+            self._send_json({"error": "Job not found."}, status=404)
+            return
+        email = job.get("contact_emails") or ""
+        if not email:
+            print("[email-draft] No contact email for this job.")
+            self._send_json({"error": "No contact email for this job."}, status=400)
+            return
+        try:
+            draft = request_email_draft(job, user_context=user_context)
+        except Exception as exc:
+            print(f"[email-draft] Draft error: {exc}")
+            self._send_json({"error": str(exc)}, status=500)
+            return
+        response_payload = {
+            "to": email,
+            "subject": draft["subject"],
+            "body": draft["body"],
+        }
+        self._send_json(response_payload)
+
     def _send_json(self, payload, status=200):
         data = json.dumps(payload).encode("utf-8")
         self.send_response(status)
@@ -601,4 +691,5 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"Serving on http://{host}:{port}")
+    print(f"Open in browser: http://localhost:{port}/")
     server.serve_forever()

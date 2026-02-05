@@ -16,10 +16,29 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
+
+
+def _load_dotenv(path: str) -> None:
+    if not os.path.exists(path):
+        return
+    with open(path, "r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+
+_load_dotenv(ENV_PATH)
 
 BASE_URL = "https://protennisjobs.com"
+LOGIN_URL = "https://protennisjobs.com/members/login.php"
 CATEGORY_URL = "https://protennisjobs.com/category/tennis-professional/"
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 GEOCODE_URL = "https://nominatim.openstreetmap.org/search"
 GEOCODE_USER_AGENT = "protennisjobs-scraper/1.0"
 GEOCODE_CACHE_FILE = os.path.join(DATA_DIR, "geocode_cache.json")
@@ -73,14 +92,63 @@ class JobListing:
     source_url: str
 
 
-def load_cookies() -> None:
+def login() -> bool:
+    """Log in to ProTennisJobs with username/password and get fresh cookies.
+
+    Returns True if login succeeded, False otherwise.
+    """
+    username = os.getenv("PTJ_USERNAME", "").strip()
+    password = os.getenv("PTJ_PASSWORD", "").strip()
+    if not username or not password:
+        return False
+
+    print(f"Logging in as {username}...")
+    payload = {
+        "amember_login": username,
+        "amember_pass": password,
+        "login_attempt_id": str(int(time.time())),
+    }
+    try:
+        response = SESSION.post(LOGIN_URL, data=payload, timeout=30, allow_redirects=True)
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        print(f"Login request failed: {exc}")
+        return False
+
+    # aMember sets an amember_nr cookie on successful login
+    session_cookie = SESSION.cookies.get("amember_nr")
+    if session_cookie:
+        print("Login successful — fresh session cookies obtained.")
+        return True
+
+    # Check if the response page still shows the login form (login failed)
+    if "Please log in to continue" in response.text or "amember_login" in response.text:
+        print("Login failed — check PTJ_USERNAME and PTJ_PASSWORD in .env")
+        return False
+
+    # If we got redirected away from login and have a PHPSESSID, that's also fine
+    if SESSION.cookies.get("PHPSESSID"):
+        print("Login successful — session established.")
+        return True
+
+    print("Login outcome uncertain — no session cookie found.")
+    return False
+
+
+def load_cookies_from_file() -> bool:
+    """Load cookies from data/cookies.json as a fallback.
+
+    Returns True if any cookies were loaded, False otherwise.
+    """
     cookie_file = os.path.join(DATA_DIR, "cookies.json")
+    loaded = False
     if os.path.exists(cookie_file):
         with open(cookie_file, "r", encoding="utf-8") as handle:
             data = json.load(handle)
             if isinstance(data, dict):
                 for name, value in data.items():
                     SESSION.cookies.set(name, value)
+                    loaded = True
             elif isinstance(data, list):
                 for item in data:
                     if not isinstance(item, dict):
@@ -96,6 +164,7 @@ def load_cookies() -> None:
                         path=item.get("path") or "/",
                         secure=bool(item.get("secure")),
                     )
+                    loaded = True
 
     cookie_env = os.getenv("PTJ_COOKIES")
     if cookie_env:
@@ -104,6 +173,26 @@ def load_cookies() -> None:
                 continue
             name, value = pair.split("=", 1)
             SESSION.cookies.set(name.strip(), value.strip())
+            loaded = True
+
+    return loaded
+
+
+def load_cookies() -> None:
+    """Authenticate with ProTennisJobs.
+
+    Strategy:
+    1. Try automated login with PTJ_USERNAME / PTJ_PASSWORD from .env
+    2. Fall back to cookies.json if credentials aren't set or login fails
+    """
+    if login():
+        return
+
+    print("Automated login unavailable — falling back to cookies.json")
+    if load_cookies_from_file():
+        print("Loaded cookies from file/env.")
+    else:
+        print("WARNING: No cookies loaded. Scraping may fail for login-protected pages.")
 
 
 def fetch_html(url: str, referer: Optional[str] = None) -> BeautifulSoup:

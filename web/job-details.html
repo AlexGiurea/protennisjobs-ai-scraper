@@ -327,7 +327,7 @@
         const contactUrl = job.contact_url || "";
         const email = getFirstEmail(job.contact_emails);
         if (contactUrl) {
-          return { href: contactUrl, label: "Apply now" };
+          return { href: contactUrl, label: "Apply" };
         }
         if (email) {
           const subject = encodeURIComponent(
@@ -338,12 +338,12 @@
               job.job_title || "role"
             }.%0D%0A%0D%0AThanks.`
           );
-          return { href: `mailto:${email}?subject=${subject}&body=${body}`, label: "Email to apply" };
+          return { href: `mailto:${email}?subject=${subject}&body=${body}`, label: "Email to Apply" };
         }
         if (job.source_url) {
-          return { href: job.source_url, label: "Apply on listing" };
+          return { href: job.source_url, label: "Apply" };
         }
-        return { href: "#", label: "Apply unavailable", disabled: true };
+        return { href: "#", label: "Apply", disabled: true };
       };
 
       const addPill = (text) => {

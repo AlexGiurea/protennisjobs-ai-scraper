@@ -213,6 +213,128 @@
         margin-bottom: 26px;
       }
 
+      .context-card {
+        background: linear-gradient(135deg, #ffffff, #f1f5ff);
+        border: 1px solid rgba(79, 70, 229, 0.2);
+        border-radius: 20px;
+        padding: 22px;
+        box-shadow: var(--shadow);
+        margin-bottom: 24px;
+      }
+
+      .context-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .context-header h3 {
+        font-size: 1.1rem;
+        margin-bottom: 4px;
+      }
+
+      .context-header p {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .context-status {
+        background: rgba(79, 70, 229, 0.12);
+        color: var(--accent);
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      .context-status.is-sent {
+        background: rgba(16, 185, 129, 0.18);
+        color: #047857;
+      }
+
+      .context-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .context-actions .btn {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+      }
+
+      .context-save {
+        background: var(--accent);
+        color: #ffffff;
+      }
+
+      .context-secondary {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+
+      .context-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+      }
+
+      .context-textarea {
+        width: 100%;
+        min-height: 130px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px 16px;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: var(--text);
+        background: #ffffff;
+        resize: vertical;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+      }
+
+      .context-textarea.is-saved {
+        background: #eef2ff;
+        border-color: rgba(79, 70, 229, 0.35);
+      }
+
+      .context-textarea.is-sent {
+        background: #e0e7ff;
+        border-color: rgba(79, 70, 229, 0.5);
+        box-shadow: inset 0 0 0 2px rgba(79, 70, 229, 0.15);
+      }
+
+      .context-card.is-flash {
+        animation: context-flash 0.9s ease;
+      }
+
+      @keyframes context-flash {
+        0% {
+          box-shadow: 0 0 0 rgba(79, 70, 229, 0.0);
+        }
+        40% {
+          box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.35);
+        }
+        100% {
+          box-shadow: var(--shadow);
+        }
+      }
+
+      .context-textarea:focus {
+        outline: 2px solid rgba(79, 70, 229, 0.3);
+        border-color: rgba(79, 70, 229, 0.4);
+      }
+
+      .context-hint {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
       .filters-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -428,6 +550,38 @@
               <p class="data-status" id="data-status"></p>
             </div>
           </div>
+          <section class="context-card" id="context-card" aria-label="Email personalization">
+            <div class="context-header">
+              <div>
+                <h3>Your email context</h3>
+                <p>Used to personalize the AI email draft for each role.</p>
+              </div>
+              <div class="context-actions">
+                <span class="context-status" id="user-context-status">Add your info</span>
+                <button
+                  class="btn context-save"
+                  id="save-context-btn"
+                  type="button"
+                >
+                  Save
+                </button>
+                <button class="btn context-secondary" id="edit-context-btn" type="button">
+                  Edit
+                </button>
+                <button class="btn btn-outline" id="new-context-btn" type="button">
+                  New
+                </button>
+              </div>
+            </div>
+            <textarea
+              class="context-textarea"
+              id="user-context"
+              placeholder="Example: Name, coaching background, certifications, availability, preferred roles, contact info, and any key achievements."
+            ></textarea>
+            <p class="context-hint">
+              Tip: keep it short and factual. Sent only when you press Save.
+            </p>
+          </section>
           <div class="filters">
             <form id="filter-form">
               <div class="filters-grid">
@@ -515,11 +669,20 @@
       const filterPostedTo = document.getElementById("filter-posted-to");
       const filterMinScore = document.getElementById("filter-min-score");
       const clearFiltersButton = document.getElementById("clear-filters");
+      const userContextInput = document.getElementById("user-context");
+      const userContextStatus = document.getElementById("user-context-status");
+      const saveContextButton = document.getElementById("save-context-btn");
+      const editContextButton = document.getElementById("edit-context-btn");
+      const newContextButton = document.getElementById("new-context-btn");
+      const contextCard = document.getElementById("context-card");
 
       const PAGE_SIZE = 6;
       const AUTO_REFRESH_MINUTES = 15;
+      const USER_CONTEXT_KEY = "ptj_user_context";
       let currentOffset = 0;
       let totalJobs = 0;
+      let lastSavedContext = "";
+      let contextLocked = false;
       const activeFilters = {
         q: "",
         location: "",
@@ -575,19 +738,19 @@
         const contactUrl = job.contact_url || "";
         const email = getFirstEmail(job.contact_emails);
         if (contactUrl) {
-          return { href: contactUrl, label: "Apply now" };
+          return { href: contactUrl, label: "Apply" };
         }
         if (email) {
           return {
             href: "#",
-            label: "Email to apply",
+            label: "Email to Apply",
             type: "email",
           };
         }
         if (job.source_url) {
-          return { href: job.source_url, label: "Apply on listing" };
+          return { href: job.source_url, label: "Apply" };
         }
-        return { href: "#", label: "Apply unavailable", disabled: true };
+        return { href: "#", label: "Apply", disabled: true };
       };
 
       const createJobCard = (job) => {
@@ -649,11 +812,22 @@
             applyBtn.setAttribute("aria-disabled", "true");
 
             try {
-              const response = await fetch(
-                `/api/email-draft?source_url=${encodeURIComponent(
-                  job.source_url || ""
-                )}`
-              );
+              const hasUnsavedChanges =
+                userContextInput &&
+                userContextInput.value.trim() !== lastSavedContext;
+              if (hasUnsavedChanges) {
+                alert("Please click Save on your email context before drafting.");
+                return;
+              }
+              const savedContext = lastSavedContext || "";
+              const response = await fetch("/api/email-draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  source_url: job.source_url || "",
+                  user_context: savedContext,
+                }),
+              });
               if (!response.ok) {
                 throw new Error("Unable to generate draft.");
               }
@@ -805,6 +979,96 @@
         }
       };
 
+      const setContextStatus = (text) => {
+        if (!userContextStatus) return;
+        userContextStatus.textContent = text;
+        userContextStatus.classList.toggle("is-sent", text === "Sent");
+      };
+
+      const setContextLocked = (locked) => {
+        contextLocked = locked;
+        if (userContextInput) {
+          userContextInput.readOnly = locked;
+          userContextInput.classList.toggle("is-saved", locked);
+          userContextInput.classList.toggle("is-sent", locked);
+        }
+      };
+
+      const flashContextSaved = () => {
+        if (!contextCard) return;
+        contextCard.classList.remove("is-flash");
+        void contextCard.offsetWidth;
+        contextCard.classList.add("is-flash");
+      };
+
+      const updateContextState = () => {
+        if (!userContextInput) return;
+        const current = userContextInput.value.trim();
+        const hasChanges = current !== lastSavedContext;
+        if (saveContextButton) {
+          if (!current && !lastSavedContext) {
+            saveContextButton.disabled = true;
+            saveContextButton.textContent = "Save";
+          } else {
+            saveContextButton.disabled = contextLocked || !hasChanges;
+            saveContextButton.textContent = contextLocked ? "Sent" : "Save";
+          }
+        }
+        if (editContextButton) {
+          editContextButton.disabled = !lastSavedContext && !current;
+        }
+        if (newContextButton) {
+          newContextButton.disabled = !lastSavedContext && !current;
+        }
+
+        if (contextLocked) {
+          setContextStatus(current ? "Sent" : "Add your info");
+          return;
+        }
+
+        if (!current) {
+          setContextStatus(lastSavedContext ? "Unsaved changes" : "Add your info");
+          return;
+        }
+        setContextStatus(hasChanges ? "Unsaved changes" : "Editing");
+      };
+
+      const loadUserContext = () => {
+        if (!userContextInput) return;
+        lastSavedContext = (localStorage.getItem(USER_CONTEXT_KEY) || "").trim();
+        userContextInput.value = lastSavedContext;
+        setContextLocked(Boolean(lastSavedContext));
+        updateContextState();
+      };
+
+      const saveUserContext = () => {
+        if (!userContextInput) return;
+        lastSavedContext = userContextInput.value.trim();
+        if (lastSavedContext) {
+          localStorage.setItem(USER_CONTEXT_KEY, lastSavedContext);
+        } else {
+          localStorage.removeItem(USER_CONTEXT_KEY);
+        }
+        setContextLocked(Boolean(lastSavedContext));
+        updateContextState();
+        flashContextSaved();
+      };
+
+      userContextInput?.addEventListener("input", updateContextState);
+      saveContextButton?.addEventListener("click", saveUserContext);
+      editContextButton?.addEventListener("click", () => {
+        setContextLocked(false);
+        updateContextState();
+        userContextInput?.focus();
+      });
+      newContextButton?.addEventListener("click", () => {
+        setContextLocked(false);
+        if (userContextInput) userContextInput.value = "";
+        lastSavedContext = "";
+        localStorage.removeItem(USER_CONTEXT_KEY);
+        userContextInput?.focus();
+        updateContextState();
+      });
       let autoRefreshInFlight = false;
       const scheduleAutoRefresh = () => {
         if (!AUTO_REFRESH_MINUTES) return;
@@ -844,6 +1108,7 @@
       viewMoreButton?.addEventListener("click", () => loadJobs());
 
       (async () => {
+        loadUserContext();
         await loadStats();
         await loadJobs({ reset: true });
         scheduleAutoRefresh();
