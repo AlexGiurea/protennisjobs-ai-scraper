@@ -1,3 +1,4 @@
+import atexit
 import csv
 import json
 import os
@@ -18,6 +19,7 @@ CSV_PATH = os.path.join(DATA_DIR, "protennisjobs.csv")
 REFRESH_INTERVAL_DAYS = float(os.getenv("PTJ_REFRESH_DAYS", "3"))
 REFRESH_ENABLED = REFRESH_INTERVAL_DAYS > 0
 ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
+PID_PATH = os.path.join(PROJECT_ROOT, ".server.pid")
 
 
 def load_dotenv(path):
@@ -118,6 +120,75 @@ def normalize_text(value):
     return value.strip().lower() if value else ""
 
 
+def _pid_is_running(pid):
+    if not pid or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def ensure_single_instance():
+    existing_pid = None
+    if os.path.exists(PID_PATH):
+        try:
+            with open(PID_PATH, "r", encoding="utf-8") as handle:
+                existing_pid = int((handle.read() or "").strip() or "0")
+        except (OSError, ValueError):
+            existing_pid = None
+
+    if existing_pid and existing_pid != os.getpid() and _pid_is_running(existing_pid):
+        raise RuntimeError(
+            f"Server already running (pid {existing_pid}). Stop it or delete {PID_PATH}."
+        )
+
+    try:
+        with open(PID_PATH, "w", encoding="utf-8") as handle:
+            handle.write(str(os.getpid()))
+    except OSError:
+        pass
+
+    def _cleanup_pid():
+        try:
+            if os.path.exists(PID_PATH):
+                with open(PID_PATH, "r", encoding="utf-8") as handle:
+                    pid = int((handle.read() or "").strip() or "0")
+                if pid == os.getpid():
+                    os.remove(PID_PATH)
+        except (OSError, ValueError):
+            pass
+
+    atexit.register(_cleanup_pid)
+
+
+def extract_org_name(job):
+    summary = (job.get("job_summary") or "").strip()
+    if summary and " is looking for" in summary:
+        return summary.split(" is looking for", 1)[0].strip()
+    contact_name = (job.get("contact_name") or "").strip()
+    if contact_name and any(keyword in contact_name.lower() for keyword in ["club", "academy", "resort", "center", "centre"]):
+        return contact_name
+    return ""
+
+
+def infer_contact_name(job_summary, contact_name, contact_url):
+    if contact_name:
+        return contact_name
+    inferred = extract_org_name({"job_summary": job_summary, "contact_name": ""})
+    if inferred:
+        return inferred
+    if contact_url:
+        host = urlparse(contact_url).hostname or ""
+        if host:
+            host = host[4:] if host.startswith("www.") else host
+            parts = host.split(".")
+            base = parts[-2] if len(parts) >= 2 else parts[0]
+            return base.replace("-", " ").title()
+    return ""
+
+
 def load_jobs():
     jobs = []
     with open(CSV_PATH, newline="", encoding="utf-8") as file:
@@ -142,7 +213,12 @@ def load_jobs():
                 "physical_requirements": row.get("physical_requirements") or "",
                 "how_to_apply": row.get("how_to_apply") or "",
                 "contact_emails": row.get("contact_emails") or "",
-                "contact_name": row.get("contact_name") or "Unknown org",
+                "contact_name": infer_contact_name(
+                    row.get("job_summary"),
+                    row.get("contact_name"),
+                    row.get("contact_url"),
+                )
+                or "Unknown org",
                 "contact_city": row.get("contact_city") or "",
                 "contact_address": row.get("contact_address") or "",
                 "contact_url": row.get("contact_url") or "",
@@ -361,16 +437,6 @@ alex.rares.giurea@gmail.com
 """
 
 
-def extract_org_name(job):
-    summary = (job.get("job_summary") or "").strip()
-    if summary and " is looking for" in summary:
-        return summary.split(" is looking for", 1)[0].strip()
-    contact_name = (job.get("contact_name") or "").strip()
-    if contact_name and any(keyword in contact_name.lower() for keyword in ["club", "academy", "resort", "center", "centre"]):
-        return contact_name
-    return ""
-
-
 def guess_last_name(contact_name):
     if not contact_name:
         return ""
@@ -527,9 +593,12 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    ensure_single_instance()
     os.chdir(WEB_DIR)
     if REFRESH_ENABLED:
         threading.Thread(target=refresh_loop, daemon=True).start()
-    server = ThreadingHTTPServer(("localhost", 8000), Handler)
-    print("Serving on http://localhost:8000")
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    server = ThreadingHTTPServer((host, port), Handler)
+    print(f"Serving on http://{host}:{port}")
     server.serve_forever()
