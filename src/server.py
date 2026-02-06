@@ -1,5 +1,6 @@
 import atexit
 import csv
+import hashlib
 import json
 import os
 import threading
@@ -40,62 +41,7 @@ load_dotenv(ENV_PATH)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_EMAIL_MODEL", "gpt-4o-mini")
 OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/responses")
-
-PROFILE = {
-    "preferred_name": "Alex",
-    "full_name": "Alex Giurea",
-    "location": "Tennessee (during school)",
-    "school": "Lincoln Memorial University (LMU), Harrogate, Tennessee",
-    "degree": "Business Analytics, graduating May 2026",
-    "tennis_background": [
-        "Playing since age 7",
-        "College tennis athlete",
-        "Leadership experience as a top lineup player",
-    ],
-    "target_role": "Tennis Professional at a country club",
-    "duties": [
-        "Private lessons",
-        "Group clinics",
-        "Hitting sessions",
-        "Junior programs",
-        "Beginner adult programs",
-        "Member engagement",
-        "Event support",
-    ],
-    "strengths": [
-        "Clear, simple communication",
-        "High energy, dependable, professional",
-        "Good at building rapport with members and juniors",
-        "Comfortable leading groups and structured sessions",
-        "Strong work ethic and long practice background",
-    ],
-    "leadership": [
-        "Experience leading in team and academic settings",
-        "Reliable and organized",
-    ],
-    "availability": (
-        "Main availability: August 2026 to April/May 2027. "
-        "Summer 2026: Maine (June to August or early fall 2026)."
-    ),
-    "work_auth": (
-        "International student pathway; can work legally under OPT after graduation in 2026."
-    ),
-    "tone": "Confident, friendly, professional. Simple sentences and vocabulary.",
-    "must_include": [
-        "Availability window",
-        "Willingness to hop on a quick call",
-        "Clear next step",
-    ],
-    "style_constraints": [
-        "No bold text",
-        "No em dashes",
-    ],
-    "sample_reference": (
-        "Keep structure similar to a concise intro, short experience paragraph, "
-        "availability paragraph, and polite close."
-    ),
-    "contact_phone": "423-801-3020",
-}
+OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
 
 
 def parse_date(value):
@@ -275,6 +221,324 @@ def compute_stats(jobs):
 STATS = compute_stats(ALL_JOBS)
 
 
+# ── Chatbot / Vector Store ──────────────────────────────────────────
+
+VS_CACHE_PATH = os.path.join(DATA_DIR, "chatbot_vs_cache.json")
+CHATBOT_DATA_PATH = os.path.join(DATA_DIR, "chatbot_jobs_data.txt")
+VECTOR_STORE_ID = None
+VS_READY = threading.Event()
+
+CHATBOT_SYSTEM_PROMPT = (
+    "You are a friendly and knowledgeable tennis job market assistant for the "
+    "Pro Tennis Jobs database. You have access to a comprehensive, up-to-date "
+    "database of tennis job listings sourced from protennisjobs.com.\n\n"
+    "Your role is to help users explore tennis job opportunities by:\n"
+    "- Answering questions about available positions, locations, compensation, "
+    "and qualifications\n"
+    "- Comparing different roles or opportunities\n"
+    "- Providing market insights and trends based on the data\n"
+    "- Helping users find roles matching their specific criteria\n"
+    "- Summarizing job details clearly and concisely\n\n"
+    "Guidelines:\n"
+    "- Always search the file for actual data before responding\n"
+    "- Be specific with numbers, locations, and job details\n"
+    "- If information isn't available in the data, say so honestly\n"
+    "- Keep responses concise but thorough (aim for 2-4 paragraphs max)\n"
+    "- Use a warm, professional tone appropriate for career guidance\n"
+    "- When listing multiple jobs, format them clearly\n"
+    "- Do not invent or fabricate job listings\n"
+    "- When referencing specific jobs, mention the title, organization, "
+    "and location so the user can find them on the site"
+)
+
+
+def prepare_jobs_data_file():
+    """Create a structured text file from all job data for vector search."""
+    lines = [
+        "=== PRO TENNIS JOBS DATABASE ===",
+        f"Total Jobs: {len(ALL_JOBS)}",
+        f"Average Fit Score: {STATS.get('avgScore', 'N/A')}",
+        f"Top Hiring State: {STATS.get('topState', 'Unknown')}",
+        f"Most Recent Posting: {STATS.get('latestDate', 'Unknown')}",
+        "Data Source: protennisjobs.com",
+        "=" * 50,
+        "",
+    ]
+
+    for i, job in enumerate(ALL_JOBS, 1):
+        location = f"{job['location']['city']}, {job['location']['state']}"
+        lines.append(f"=== JOB LISTING #{i} ===")
+        lines.append(f"Title: {job.get('job_title', 'Unknown')}")
+        lines.append(f"Organization: {job.get('contact_name', 'Unknown')}")
+        lines.append(f"Location: {location}")
+        lines.append(f"Posted Date: {job.get('posted_date', 'Unknown')}")
+
+        score = job.get("suitability_score")
+        if score is not None:
+            lines.append(f"Fit Score: {score}/10")
+        distance = job.get("distance_to_harrogate_tn_miles")
+        if distance is not None:
+            lines.append(f"Distance to Harrogate, TN: {distance} miles")
+
+        lines.append("")
+
+        for field, label in [
+            ("job_summary", "Summary"),
+            ("position_overview", "Position Overview"),
+            ("key_responsibilities", "Key Responsibilities"),
+            ("required_qualifications", "Required Qualifications"),
+            ("preferred_certifications", "Preferred Certifications"),
+            ("compensation_benefits", "Compensation & Benefits"),
+            ("work_schedule", "Work Schedule"),
+            ("physical_requirements", "Physical Requirements"),
+            ("how_to_apply", "How to Apply"),
+        ]:
+            value = (job.get(field) or "").strip()
+            if value:
+                lines.append(f"{label}: {value}")
+
+        if job.get("contact_emails"):
+            lines.append(f"Contact Email: {job['contact_emails']}")
+        if job.get("contact_url"):
+            lines.append(f"Contact URL: {job['contact_url']}")
+        if job.get("source_url"):
+            lines.append(f"Source URL: {job['source_url']}")
+
+        lines.append("=" * 50)
+        lines.append("")
+
+    with open(CHATBOT_DATA_PATH, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    return CHATBOT_DATA_PATH
+
+
+def compute_data_hash(filepath):
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def load_vs_cache():
+    if os.path.exists(VS_CACHE_PATH):
+        try:
+            with open(VS_CACHE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def save_vs_cache(data):
+    try:
+        with open(VS_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except OSError:
+        pass
+
+
+def _vs_headers(content_type="application/json"):
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "OpenAI-Beta": "assistants=v2",
+    }
+    if content_type:
+        headers["Content-Type"] = content_type
+    return headers
+
+
+def setup_vector_store():
+    """Create or reuse an OpenAI Vector Store with current job data."""
+    global VECTOR_STORE_ID
+    if not OPENAI_API_KEY:
+        print("[chatbot] OPENAI_API_KEY not set; vector store skipped.")
+        return
+
+    print("[chatbot] Preparing job data file...")
+    data_path = prepare_jobs_data_file()
+    data_hash = compute_data_hash(data_path)
+
+    # Check cache — reuse if data hasn't changed
+    cache = load_vs_cache()
+    if cache.get("data_hash") == data_hash and cache.get("vector_store_id"):
+        vs_id = cache["vector_store_id"]
+        try:
+            resp = requests.get(
+                f"https://api.openai.com/v1/vector_stores/{vs_id}",
+                headers=_vs_headers(),
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                VECTOR_STORE_ID = vs_id
+                VS_READY.set()
+                print(f"[chatbot] Reusing cached vector store: {vs_id}")
+                return
+        except requests.RequestException:
+            pass
+
+    # Clean up previous resources
+    old_vs = cache.get("vector_store_id")
+    if old_vs:
+        try:
+            requests.delete(
+                f"https://api.openai.com/v1/vector_stores/{old_vs}",
+                headers=_vs_headers(),
+                timeout=10,
+            )
+        except requests.RequestException:
+            pass
+    old_file = cache.get("file_id")
+    if old_file:
+        try:
+            requests.delete(
+                f"https://api.openai.com/v1/files/{old_file}",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                timeout=10,
+            )
+        except requests.RequestException:
+            pass
+
+    # 1. Create vector store
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/vector_stores",
+            headers=_vs_headers(),
+            json={"name": "Pro Tennis Jobs Data"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        vs_id = resp.json()["id"]
+        print(f"[chatbot] Created vector store: {vs_id}")
+    except requests.RequestException as exc:
+        print(f"[chatbot] Failed to create vector store: {exc}")
+        return
+
+    # 2. Upload data file
+    try:
+        with open(data_path, "rb") as f:
+            resp = requests.post(
+                "https://api.openai.com/v1/files",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                files={"file": ("protennisjobs_data.txt", f, "text/plain")},
+                data={"purpose": "assistants"},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            file_id = resp.json()["id"]
+            print(f"[chatbot] Uploaded file: {file_id}")
+    except requests.RequestException as exc:
+        print(f"[chatbot] Failed to upload file: {exc}")
+        return
+
+    # 3. Attach file to vector store
+    try:
+        resp = requests.post(
+            f"https://api.openai.com/v1/vector_stores/{vs_id}/files",
+            headers=_vs_headers(),
+            json={"file_id": file_id},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        print("[chatbot] File added to vector store; waiting for indexing...")
+    except requests.RequestException as exc:
+        print(f"[chatbot] Failed to attach file: {exc}")
+        return
+
+    # 4. Poll until indexing completes
+    for _ in range(60):
+        try:
+            resp = requests.get(
+                f"https://api.openai.com/v1/vector_stores/{vs_id}/files/{file_id}",
+                headers=_vs_headers(),
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                status = resp.json().get("status")
+                if status == "completed":
+                    break
+                if status in ("failed", "cancelled"):
+                    print(f"[chatbot] File indexing {status}.")
+                    return
+        except requests.RequestException:
+            pass
+        time.sleep(2)
+    else:
+        print("[chatbot] File indexing timed out.")
+        return
+
+    VECTOR_STORE_ID = vs_id
+    VS_READY.set()
+    save_vs_cache(
+        {
+            "vector_store_id": vs_id,
+            "file_id": file_id,
+            "data_hash": data_hash,
+            "created_at": datetime.now().isoformat(),
+        }
+    )
+    print(f"[chatbot] Vector store ready: {vs_id}")
+
+
+def chat_with_data(messages):
+    """Send a chat request to OpenAI Responses API with file search."""
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is missing.")
+
+    if not VS_READY.wait(timeout=30):
+        raise RuntimeError(
+            "The job data index is still being prepared. Please try again in a moment."
+        )
+
+    input_messages = []
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user", "assistant") and content:
+            input_messages.append({"role": role, "content": content})
+
+    if not input_messages:
+        raise RuntimeError("No messages provided.")
+
+    payload = {
+        "model": OPENAI_CHAT_MODEL,
+        "instructions": CHATBOT_SYSTEM_PROMPT,
+        "input": input_messages,
+        "tools": [
+            {
+                "type": "file_search",
+                "vector_store_ids": [VECTOR_STORE_ID],
+            }
+        ],
+        "temperature": 0.4,
+        "max_output_tokens": 1024,
+        "store": True,
+    }
+
+    try:
+        resp = requests.post(
+            OPENAI_API_URL,
+            headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=60,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        msg = str(exc)
+        if hasattr(exc, "response") and exc.response is not None:
+            msg = f"OpenAI error: {exc.response.status_code} {exc.response.text}"
+        raise RuntimeError(msg) from exc
+
+    data = resp.json()
+    text = extract_openai_text(data)
+    if not text:
+        raise RuntimeError("Empty response from assistant.")
+    return text
+
+
 def filter_jobs(jobs, query):
     q = normalize_text(query.get("q", [""])[0])
     location_filter = normalize_text(query.get("location", [""])[0])
@@ -351,7 +615,7 @@ def find_job_by_source_url(jobs, source_url):
 
 
 def refresh_dataset():
-    global ALL_JOBS, STATS, LAST_REFRESH_TS
+    global ALL_JOBS, STATS, LAST_REFRESH_TS, VECTOR_STORE_ID
     if not REFRESH_LOCK.acquire(blocking=False):
         return False
     try:
@@ -362,6 +626,10 @@ def refresh_dataset():
         ALL_JOBS = load_jobs()
         STATS = compute_stats(ALL_JOBS)
         LAST_REFRESH_TS = time.time()
+        # Rebuild chatbot vector store with new data
+        VS_READY.clear()
+        VECTOR_STORE_ID = None
+        threading.Thread(target=setup_vector_store, daemon=True).start()
         print("Refresh complete.")
         return True
     except Exception as exc:
@@ -426,35 +694,6 @@ EMAIL_TEMPLATE = """Use a short, clean structure:
 5) Friendly close with name and contact info."""
 
 
-def format_profile(profile):
-    def _join(value):
-        if not value:
-            return ""
-        if isinstance(value, (list, tuple)):
-            return ", ".join([str(item) for item in value if item])
-        return str(value)
-
-    fields = [
-        ("Name", profile.get("full_name")),
-        ("Preferred name", profile.get("preferred_name")),
-        ("Location", profile.get("location")),
-        ("School", profile.get("school")),
-        ("Degree", profile.get("degree")),
-        ("Tennis background", _join(profile.get("tennis_background"))),
-        ("Target role", profile.get("target_role")),
-        ("Duties", _join(profile.get("duties"))),
-        ("Strengths", _join(profile.get("strengths"))),
-        ("Leadership", _join(profile.get("leadership"))),
-        ("Availability", profile.get("availability")),
-        ("Work authorization", profile.get("work_auth")),
-        ("Tone", profile.get("tone")),
-        ("Must include", _join(profile.get("must_include"))),
-        ("Style constraints", _join(profile.get("style_constraints"))),
-        ("Phone", profile.get("contact_phone")),
-    ]
-    lines = [f"{label}: {value}" for label, value in fields if value]
-    return "\n".join(lines)
-
 
 def guess_last_name(contact_name):
     if not contact_name:
@@ -473,15 +712,13 @@ def build_email_prompt(job, user_context):
     job_title = job.get("job_title") or "tennis role"
     job_summary = job.get("job_summary") or job.get("position_overview") or ""
     user_context = (user_context or "").strip()
-    fallback_profile = format_profile(PROFILE)
 
     instructions = [
         "Write a concise job application email (120-180 words).",
         f"Address the contact as Coach {contact_last_name or 'there'}.",
         f"Role: {job_title} at {org_name}.",
         f"Location: {location or 'not provided'}.",
-        "Use the user context below as the primary source for the candidate info.",
-        "If user context is empty, use the fallback profile instead.",
+        "Use the user context below as the source for the candidate info.",
         "Reference relevant job details from the job summary when possible.",
         "Do not invent credentials or experiences not stated.",
         "Keep the tone professional, warm, and direct.",
@@ -495,9 +732,6 @@ def build_email_prompt(job, user_context):
         [
             "User context:",
             user_context or "(none provided)",
-            "",
-            "Fallback profile (use only if user context is empty):",
-            fallback_profile or "(none provided)",
             "",
             "Job summary:",
             job_summary or "(not provided)",
@@ -628,6 +862,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/chat":
+            self._handle_chat()
+            return
         if parsed.path != "/api/email-draft":
             self._send_json({"error": "Not found."}, status=404)
             return
@@ -673,6 +910,29 @@ class Handler(SimpleHTTPRequestHandler):
         }
         self._send_json(response_payload)
 
+    def _handle_chat(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        body = self.rfile.read(length) if length > 0 else b""
+        try:
+            payload = json.loads(body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            self._send_json({"error": "Invalid JSON body."}, status=400)
+            return
+        messages = payload.get("messages", [])
+        if not messages:
+            self._send_json({"error": "No messages provided."}, status=400)
+            return
+        try:
+            response_text = chat_with_data(messages)
+        except Exception as exc:
+            print(f"[chatbot] Error: {exc}")
+            self._send_json({"error": str(exc)}, status=500)
+            return
+        self._send_json({"response": response_text})
+
     def _send_json(self, payload, status=200):
         data = json.dumps(payload).encode("utf-8")
         self.send_response(status)
@@ -685,6 +945,7 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     ensure_single_instance()
     os.chdir(WEB_DIR)
+    threading.Thread(target=setup_vector_store, daemon=True).start()
     if REFRESH_ENABLED:
         threading.Thread(target=refresh_loop, daemon=True).start()
     host = os.getenv("HOST", "0.0.0.0")
